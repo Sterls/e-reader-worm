@@ -50,9 +50,9 @@ export function makeGoals(level, rng) {
 export function goalText(goal) {
   switch (goal.type) {
     case 'score': return `Score ${goal.target.toLocaleString('en-GB')}`;
-    case 'longWords': return `${goal.target} words of ${goal.minLen}+ letters`;
-    case 'letter': return `Play a word with ${goal.letter}`;
-    case 'glitch': return `Clear ${goal.target} glitch tile${goal.target > 1 ? 's' : ''}`;
+    case 'longWords': return `${goal.target} words, ${goal.minLen}+ letters`;
+    case 'letter': return `A word with ${goal.letter}`;
+    case 'glitch': return `Clear ${goal.target} glitch${goal.target > 1 ? 'es' : ''}`;
     case 'special': return `Use ${goal.target} bonus tile${goal.target > 1 ? 's' : ''}`;
     default: return '';
   }

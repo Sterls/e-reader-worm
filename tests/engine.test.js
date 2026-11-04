@@ -182,3 +182,36 @@ test('long simulated games stay healthy', async () => {
     assert.ok(s.level >= 3, `seed ${seed} only reached level ${s.level}`);
   }
 });
+
+test('bolt, crystal and wild tiles only appear as rewards', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { Dictionary } = await import('../public/js/logic/dictionary.js');
+  const { rewardsForLength } = await import('../public/js/logic/scoring.js');
+  const dict = Dictionary.fromText(readFileSync(new URL('../public/words.txt', import.meta.url), 'utf8'));
+  const count = (s) => {
+    const c = { bolt: 0, crystal: 0, wild: 0 };
+    s.board.flat().forEach((t) => { if (t.kind in c) c[t.kind]++; });
+    return c;
+  };
+  for (let seed = 11; seed <= 14; seed++) {
+    const s = newGame(seed);
+    for (let turn = 0; turn < 40 && !s.gameOver; turn++) {
+      if (s.levelComplete) startNextLevel(s);
+      const best = findBestWord(s.board, dict, { maxNodes: 50000 });
+      if (!best) { s.shuffles++; useShuffle(s); continue; }
+      const before = count(s);
+      const usedKinds = best.path.map(([r, c]) => s.board[r][c].kind);
+      const res = submitWord(s, dict, best.path);
+      const removed = { bolt: 0, crystal: 0, wild: 0 };
+      usedKinds.forEach((k) => { if (k in removed) removed[k]++; });
+      res.events.filter((e) => e.type === 'cleared').forEach((e) => { if (e.kind in removed) removed[e.kind]++; });
+      res.events.filter((e) => e.type === 'glitchExpired').forEach(() => {});
+      const earned = { bolt: 0, crystal: 0, wild: 0 };
+      rewardsForLength(res.length).forEach((k) => { if (k in earned) earned[k]++; });
+      const after = count(s);
+      for (const k of Object.keys(after)) {
+        assert.equal(after[k], before[k] - removed[k] + earned[k], `seed ${seed} turn ${turn} ${k} (${res.word})`);
+      }
+    }
+  }
+});

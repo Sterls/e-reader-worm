@@ -48,10 +48,10 @@ function applyTheme() {
   document.querySelector('meta[name="theme-color"]').setAttribute('content', bg || '#10202a');
 }
 
-function setSound(on) {
+function setSound(on, { unlock = true } = {}) {
   settings.sound = on;
   sound.enabled = on;
-  if (on) sound.unlock();
+  if (on && unlock) sound.unlock();
   saveSettings();
   $('titleSoundBtn').innerHTML = on ? SOUND_ON : SOUND_OFF;
 }
@@ -76,7 +76,11 @@ function updateTitle() {
 }
 
 // ---------- Modal ----------
-function showModal(html, actions = {}) {
+let modalBack = null;
+
+/** onBack: what the Android back button does while this window is open (null = nothing). */
+function showModal(html, actions = {}, onBack = null) {
+  modalBack = onBack;
   const card = $('modalCard');
   card.innerHTML = html;
   card.querySelectorAll('[data-action]').forEach((btn) => {
@@ -89,6 +93,7 @@ function showModal(html, actions = {}) {
 }
 
 function closeModal() {
+  modalBack = null;
   $('modal').hidden = true;
   $('modalCard').innerHTML = '';
 }
@@ -111,14 +116,13 @@ const HOW_TO = `
   </ul>`;
 
 function showHowTo(onClose) {
-  showModal(`${HOW_TO}<div class="actions"><button class="btn primary" data-action="ok">Got it</button></div>`, {
-    ok: () => {
-      closeModal();
-      settings.seenHowTo = true;
-      saveSettings();
-      onClose?.();
-    },
-  });
+  const ok = () => {
+    closeModal();
+    settings.seenHowTo = true;
+    saveSettings();
+    onClose?.();
+  };
+  showModal(`${HOW_TO}<div class="actions"><button class="btn primary" data-action="ok">Got it</button></div>`, { ok }, ok);
 }
 
 function showCredits() {
@@ -127,8 +131,10 @@ function showCredits() {
     <p><b>E-Reader Worm</b> is an original word game.</p>
     <p>Word list: <b>ENABLE</b> (Enhanced North American Benchmark Lexicon), which is in the public domain.</p>
     <p>All sounds are generated in code. Fonts are your device's own.</p>
-    <p>This web version has no ads and no tracking. Your scores are saved only on this device.</p>
-    <div class="actions"><button class="btn primary" data-action="ok">Close</button></div>`, { ok: closeModal });
+    <p>${Ads.isAvailable() || window.Capacitor?.isNativePlatform?.()
+      ? 'The app shows optional video ads only when you choose to watch one. See the privacy policy at the game\'s website.'
+      : 'This web version has no ads and no tracking.'} Your scores are saved only on this device.</p>
+    <div class="actions"><button class="btn primary" data-action="ok">Close</button></div>`, { ok: closeModal }, closeModal);
 }
 
 // ---------- HUD ----------
@@ -410,7 +416,16 @@ function checkStuck() {
 }
 
 // ---------- Power-ups ----------
-async function offerAd(what, give) {
+/** Shows a rewarded video. Game sounds pause while it plays. */
+async function watchAd() {
+  sound.suspend();
+  const ok = await Ads.showRewarded();
+  if (settings.sound) sound.unlock();
+  if (!ok) showBanner('No video right now', 'Please try again later', 'info');
+  return ok;
+}
+
+function offerAd(what, give) {
   if (!Ads.isAvailable()) {
     showBanner(`No ${what}s left`, 'Clear a level to earn more', 'info');
     return;
@@ -420,10 +435,16 @@ async function offerAd(what, give) {
     <button class="btn" data-action="no">No thanks</button></div>`, {
     watch: async () => {
       closeModal();
-      if (await Ads.showRewarded(what)) { give(); renderHud(); saveGame(); }
+      if (await watchAd()) {
+        give();
+        renderHud();
+        saveGame();
+        sound.reward();
+        showBanner(`+2 ${what}s`, 'Thanks for watching!', 'info');
+      }
     },
     no: closeModal,
-  });
+  }, closeModal);
 }
 
 function onShuffle() {
@@ -516,7 +537,7 @@ function showGameOver() {
       <button class="btn" data-action="menu">Main menu</button>
     </div>`, {
     revive: async () => {
-      if (await Ads.showRewarded('revive')) {
+      if (await watchAd()) {
         Engine.revive(state);
         state.revived = true;
         closeModal();
@@ -527,7 +548,7 @@ function showGameOver() {
     },
     again: () => { closeModal(); startGame(Engine.newGame()); },
     menu: () => { closeModal(); updateTitle(); showScreen('title'); },
-  });
+  }, () => { closeModal(); updateTitle(); showScreen('title'); });
 }
 
 function showPause() {
@@ -542,6 +563,7 @@ function showPause() {
     <div class="actions">
       <button class="btn primary" data-action="resume">Resume</button>
       <button class="btn" data-action="how">How to play</button>
+      ${Ads.hasPrivacyOptions() ? '<button class="btn" data-action="privacy">Privacy settings</button>' : ''}
       <button class="btn" data-action="restart">New game</button>
       <button class="btn" data-action="menu">Main menu</button>
     </div>`, {
@@ -559,11 +581,14 @@ function showPause() {
     },
     theme: (btn) => {
       const i = THEME_ORDER.indexOf(settings.theme);
-      settings.theme = THEME_ORDER[(i + 1) % THEME_ORDER.length];
+      const next = THEME_ORDER[(i + 1) % THEME_ORDER.length];
+      if (!themeUnlocked(next)) { offerTheme(next); return; }
+      settings.theme = next;
       saveSettings();
       applyTheme();
       btn.textContent = THEMES[settings.theme].name;
     },
+    privacy: () => Ads.showPrivacyOptions(),
     resume: closeModal,
     how: () => showHowTo(showPause),
     restart: () => {
@@ -572,10 +597,67 @@ function showPause() {
         <button class="btn" data-action="no">Cancel</button></div>`, {
         yes: () => { closeModal(); updateBest(); startGame(Engine.newGame()); },
         no: () => { closeModal(); showPause(); },
-      });
+      }, () => { closeModal(); showPause(); });
     },
     menu: () => { closeModal(); saveGame(); updateTitle(); showScreen('title'); },
-  });
+  }, closeModal);
+}
+
+// Extra colour themes are free on the web. In the app they unlock by watching one video
+// (or are free if videos aren't available, so nobody is ever stuck).
+function themeUnlocked(name) {
+  return name === 'ink' || !Ads.isAvailable() || (settings.unlockedThemes || []).includes(name);
+}
+
+function offerTheme(name) {
+  const label = THEMES[name].name;
+  showModal(`<h2>${label} theme</h2><p>Watch a short video to unlock the ${label} theme for good?</p>
+    <div class="actions"><button class="btn gold" data-action="watch">Watch video</button>
+    <button class="btn" data-action="skip">Skip this theme</button></div>`, {
+    watch: async () => {
+      closeModal();
+      if (await watchAd()) {
+        settings.unlockedThemes = [...(settings.unlockedThemes || []), name];
+        settings.theme = name;
+        saveSettings();
+        applyTheme();
+        sound.reward();
+      }
+      showPause();
+    },
+    skip: () => {
+      const i = THEME_ORDER.indexOf(name);
+      const after = THEME_ORDER.slice(i + 1).find(themeUnlocked) || 'ink';
+      settings.theme = after;
+      saveSettings();
+      applyTheme();
+      closeModal();
+      showPause();
+    },
+  }, () => { closeModal(); showPause(); });
+}
+
+// ---------- Android back button ----------
+function onBack(App) {
+  if (modalOpen()) {
+    if (modalBack) modalBack();
+    return;
+  }
+  if ($('game').classList.contains('active')) {
+    if (path.length) clearSelection();
+    else showPause();
+    return;
+  }
+  App?.exitApp?.();
+}
+
+function setUpNative() {
+  if (!window.Capacitor?.isNativePlatform?.()) return;
+  const App = window.Capacitor.registerPlugin('App');
+  App.addListener('backButton', () => onBack(App));
+  App.addListener('pause', () => { sound.suspend(); saveGame(); });
+  App.addListener('resume', () => { if (settings.sound) sound.unlock(); });
+  Ads.init();
 }
 
 // ---------- Game lifecycle ----------
@@ -639,7 +721,7 @@ async function loadWords() {
 
 function init() {
   applyTheme();
-  setSound(settings.sound);
+  setSound(settings.sound, { unlock: false });
   updateTitle();
 
   const canvas = $('board');
@@ -658,7 +740,7 @@ function init() {
     if (savedGame()) {
       showModal(`<h2>New game?</h2><p>This will replace your saved game.</p>
         <div class="actions"><button class="btn primary" data-action="yes">Start new game</button>
-        <button class="btn" data-action="no">Cancel</button></div>`, { yes: () => { closeModal(); go(); }, no: closeModal });
+        <button class="btn" data-action="no">Cancel</button></div>`, { yes: () => { closeModal(); go(); }, no: closeModal }, closeModal);
     } else if (!settings.seenHowTo) {
       showHowTo(go);
     } else go();
@@ -689,9 +771,15 @@ function init() {
   window.addEventListener('pagehide', saveGame);
 
   if (new URLSearchParams(location.search).has('debug')) {
-    window.__erw = { get state() { return state; }, get dict() { return dict; }, view };
+    window.__erw = {
+      get state() { return state; },
+      get dict() { return dict; },
+      view,
+      refresh() { view.sync(state.board, { instant: true }); renderHud({ instantScore: true }); },
+    };
   }
 
+  setUpNative();
   loop();
   loadWords();
 }

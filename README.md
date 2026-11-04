@@ -12,6 +12,10 @@ npm start
 ```
 Then open http://localhost:8080 (add `?debug` to the address for test hooks).
 
+## Android
+After changing anything in `public/`, run `npx cap sync android` (GitHub does this automatically when building).
+App icons/splash screens are made by `node scripts/make-android-art.cjs`.
+
 ## Run the tests
 ```bash
 npm test
@@ -27,7 +31,14 @@ npm test
 | `public/js/ads.js` | Rewarded-ad hook (off on the web; used by the phone apps later) |
 | `public/words.txt` | The word list (ENABLE, public domain, see CREDITS.md) |
 | `tests/` | Automated tests (`npm test`) |
+| `android/` | The Android app project (Capacitor). Built by GitHub Actions |
+| `capacitor.config.json` | App name and ID for the phone apps |
+| `public/js/ad-config.js` | AdMob ad unit IDs (public IDs; test IDs for now) |
+| `public/privacy.html` | Privacy policy page |
+| `store/` | Play Store screenshots and feature graphic |
 | `docs/HOSTING.md` | How to put the game online with Cloudflare |
+| `docs/ANDROID.md` | Testing the Android app, upload key, first Play upload |
+| `docs/PLAY_STORE.md` | Draft store listing text and Play form answers |
 | `TODO.md` | Things the owner needs to do (accounts, store listings, etc.) |
 
 ## Game rules in short

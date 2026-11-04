@@ -1,0 +1,8 @@
+{
+  "appId": "com.ereaderworm.game",
+  "appName": "E-Reader Worm",
+  "webDir": "public",
+  "android": {
+    "backgroundColor": "#10202a"
+  }
+}

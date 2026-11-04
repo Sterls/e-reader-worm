@@ -1,0 +1,32 @@
+# Run this ONCE, by hand, to create the Android upload key.
+# Before running it, add a repository secret called ANDROID_KEYSTORE_PASSWORD (see TODO.md).
+name: Create Android upload key (run once)
+on: workflow_dispatch
+
+jobs:
+  create-key:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Create the key
+        env:
+          PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ ${#PW} -lt 8 ]; then
+            echo "::error::First add a secret called ANDROID_KEYSTORE_PASSWORD (at least 8 characters). See TODO.md."
+            exit 1
+          fi
+          keytool -genkeypair -keystore upload.jks -storetype PKCS12 -alias upload -keyalg RSA -keysize 2048 \
+            -validity 10000 -storepass "$PW" -keypass "$PW" -dname "CN=E-Reader Worm, O=E-Reader Worm, C=GB"
+          base64 -w0 upload.jks > upload-key-base64.txt
+      - name: Download link (deleted automatically after 1 day)
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-upload-key-DELETE-AFTER-DOWNLOAD
+          path: |
+            upload.jks
+            upload-key-base64.txt
+          retention-days: 1

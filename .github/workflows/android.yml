@@ -1,0 +1,75 @@
+name: Android app
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/**'
+      - 'android/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install and test
+        run: |
+          npm ci
+          npm test
+
+      - name: Copy the game into the Android project
+        run: npx cap sync android
+
+      - name: Unpack the upload key (from GitHub Secrets)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+            echo "Signing the release build with the upload key."
+          else
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret yet, so only the test (debug) app is built. See TODO.md."
+          fi
+
+      - name: Build
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          VERSION_NAME=$(node -p "require('../package.json').version")
+          ./gradlew --no-daemon assembleDebug bundleRelease \
+            -PversionCode=${{ github.run_number }} -PversionName="$VERSION_NAME"
+          rm -f "$RUNNER_TEMP/upload.jks"
+
+      - name: Upload test app (APK to install on your phone)
+        uses: actions/upload-artifact@v4
+        with:
+          name: e-reader-worm-test-app-${{ github.run_number }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+      - name: Upload Play Store bundle (AAB)
+        if: env.ANDROID_KEYSTORE_PATH != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: e-reader-worm-play-store-${{ github.run_number }}
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30

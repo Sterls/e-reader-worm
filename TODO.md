@@ -9,17 +9,22 @@ Things **you** need to do are marked 👤. Things Claude can do next are marked 
       Google Play, the App Store and the UK IPO trade mark search (https://www.gov.uk/search-for-trademark).
       Don't use the word "Bookworm" in the name or store text (it's another company's game brand).
 
-## Before the phone apps
-- [ ] 🤖 Wrap the game with Capacitor for Android and iPhone.
-- [ ] 🤖 Add AdMob rewarded ads (only optional "watch a video for..." buttons; no banners, no forced ads).
-- [ ] 🤖 Write a privacy policy page (needed because AdMob collects advertising data) and host it on the site.
-- [ ] 🤖 Set up GitHub Actions to build the iPhone app on Apple's macOS machines.
-- [ ] 🤖 Make store screenshots and a feature graphic.
-- [ ] 👤 **Apple Developer Program**: enrol as an *Individual* at https://developer.apple.com/programs/enroll/
-      (£79 a year; needs an Apple ID with two-factor sign-in). Approval can take a few days, so start early.
+## Android app (current focus) — full guide: [docs/ANDROID.md](docs/ANDROID.md)
+- [x] 🤖 Android app with Capacitor, built automatically by GitHub (Actions → "Android app").
+- [x] 🤖 Rewarded ads (Google *test* ads for now): extra shuffles/hints, keep going after game over, unlock colour themes.
+- [x] 🤖 UK/EU consent form + "Privacy settings" button, privacy policy page (`/privacy.html`).
+- [x] 🤖 Store screenshots and feature graphic (`store/` folder), draft store text and form answers ([docs/PLAY_STORE.md](docs/PLAY_STORE.md)).
+- [ ] 👤 Install the test app on your phone and try it (docs/ANDROID.md, step 1).
+- [ ] 👤 Check you're happy with the app ID **`com.ereaderworm.game`**. It can **never** change after the first
+      Play upload. Tell Claude now if you want something else (e.g. matching your Whoosh Blocks style).
+- [ ] 👤 Create your upload key (docs/ANDROID.md, step 2).
+- [ ] 👤 Get a **support email** that isn't your personal one (e.g. a new free Gmail just for the game).
+      Play needs a public contact email; Claude can add it to the privacy page if you like.
+- [ ] 👤 Create the app in Play Console and do an internal test release (docs/ANDROID.md, step 3).
 - [ ] 👤 **AdMob**: sign in at https://admob.google.com with the Google account you use for Play.
       Add two apps (Android + iOS), create one **Rewarded** ad unit for each, and send Claude the
       *App IDs* and *Ad unit IDs* (they look like `ca-app-pub-…`; these are public, safe to share).
+      Android first; the iOS one can wait.
 - [ ] 👤 AdMob → **Privacy & messaging**: create the GDPR consent message (required for UK/EU players)
       and the iOS "IDFA explainer" message.
 - [ ] 👤 AdMob → **Payments**: add your bank details and tax info (UK sole trader; complete the US W-8BEN form).
@@ -33,10 +38,11 @@ Things **you** need to do are marked 👤. Things Claude can do next are marked 
       programme), **Ads** declaration: Yes.
 - [ ] 👤 Check whether your account needs **closed testing first** (personal accounts made after Nov 2023
       need 12 testers for 14 days before a production release).
-- [ ] 👤 Create the **upload key** when Claude gives you the steps. Keep it and its password somewhere safe
-      (password manager + backup). It must **never** go in the GitHub repo; it goes in GitHub *Secrets*.
 
-## Apple App Store
+## Apple App Store (later)
+- [ ] 👤 **Apple Developer Program**: enrol as an *Individual* at https://developer.apple.com/programs/enroll/
+      (£79 a year; needs an Apple ID with two-factor sign-in). Approval can take a few days.
+- [ ] 🤖 Add the iPhone project and a GitHub Actions build on macOS.
 - [ ] 👤 App Store Connect → **New App** (after enrolment).
 - [ ] 👤 **App Privacy** answers (Claude will draft them), age rating, screenshots.
 - [ ] 👤 Create an **App Store Connect API key** for GitHub Actions and add it to GitHub *Secrets*
