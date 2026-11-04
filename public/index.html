@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#10202a">
+  <meta name="description" content="E-Reader Worm: link letter tiles to make words, chase long words and clear the glitches.">
+  <title>E-Reader Worm</title>
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-theme="ink">
+  <div id="app">
+    <!-- Title screen -->
+    <section id="title" class="screen active" aria-label="Title screen">
+      <div class="title-top">
+        <button class="icon-btn" id="titleSoundBtn" aria-label="Sound on or off"></button>
+      </div>
+      <div class="logo">
+        <div class="logo-small">E&#8209;READER</div>
+        <div class="logo-tiles" aria-label="Worm">
+          <span>W</span><span>O</span><span>R</span><span>M</span>
+        </div>
+      </div>
+      <div class="mascot" id="mascot" aria-hidden="true">
+        <svg viewBox="0 0 220 210" width="220" height="210">
+          <defs>
+            <linearGradient id="wormGrad" x1="0" x2="1">
+              <stop offset="0" stop-color="#4fd391"/>
+              <stop offset="1" stop-color="#7cf0b4"/>
+            </linearGradient>
+          </defs>
+          <ellipse cx="110" cy="200" rx="70" ry="7" fill="rgba(0,0,0,0.25)"/>
+          <rect x="45" y="78" width="130" height="120" rx="16" fill="#1a2c37" stroke="var(--accent)" stroke-width="3"/>
+          <rect x="57" y="90" width="106" height="92" rx="5" fill="#efe6d0"/>
+          <g fill="#c9bc9c">
+            <rect x="66" y="100" width="60" height="5" rx="2"/>
+            <rect x="66" y="112" width="40" height="5" rx="2"/>
+            <rect x="66" y="160" width="86" height="5" rx="2"/>
+            <rect x="66" y="170" width="54" height="5" rx="2"/>
+          </g>
+          <ellipse cx="110" cy="136" rx="26" ry="9" fill="#2a2418"/>
+          <g class="worm-body">
+            <path d="M110 138 C 108 100, 150 104, 150 70" stroke="url(#wormGrad)" stroke-width="30" stroke-linecap="round" fill="none"/>
+            <path d="M104 124 q 13 -4 24 2 M118 103 q 12 -6 22 2" stroke="#3cb87a" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <circle cx="150" cy="52" r="27" fill="#7cf0b4"/>
+            <path d="M136 30 q 4 -14 -6 -18 M160 28 q 2 -14 12 -16" stroke="#3cb87a" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <circle cx="172" cy="30" r="4" fill="#ffd166"/>
+            <circle cx="129" cy="12" r="4" fill="#ffd166"/>
+            <g class="worm-eyes">
+              <circle cx="140" cy="50" r="9.5" fill="#fff" stroke="#1d2a33" stroke-width="3"/>
+              <circle cx="162" cy="50" r="9.5" fill="#fff" stroke="#1d2a33" stroke-width="3"/>
+              <line x1="149.5" y1="50" x2="152.5" y2="50" stroke="#1d2a33" stroke-width="3"/>
+              <circle cx="142" cy="51" r="3.6" fill="#1d2a33"/>
+              <circle cx="164" cy="51" r="3.6" fill="#1d2a33"/>
+            </g>
+            <path d="M141 65 q 10 8 20 0" stroke="#1d2a33" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <circle cx="133" cy="63" r="4" fill="#ff8fa3" opacity="0.6"/>
+            <circle cx="169" cy="63" r="4" fill="#ff8fa3" opacity="0.6"/>
+          </g>
+        </svg>
+      </div>
+      <div class="best" id="bestLine"></div>
+      <div class="menu">
+        <button class="btn primary" id="continueBtn" hidden>Continue</button>
+        <button class="btn primary" id="playBtn" disabled>Loading words…</button>
+        <button class="btn" id="howBtn">How to play</button>
+      </div>
+      <button class="link-btn" id="creditsBtn">Credits</button>
+    </section>
+
+    <!-- Game screen -->
+    <section id="game" class="screen" aria-label="Game">
+      <header class="hud">
+        <button class="icon-btn" id="pauseBtn" aria-label="Menu">
+          <svg viewBox="0 0 24 24" width="24" height="24"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </button>
+        <div class="hud-mid">
+          <div class="hud-level" id="levelText">Level 1</div>
+          <div class="hud-score" id="scoreText">0</div>
+        </div>
+        <div class="hearts" id="hearts" aria-label="Hearts"></div>
+      </header>
+      <div class="goals" id="goals"></div>
+      <div class="word-bar" id="wordBar">
+        <div class="word-text" id="wordText"></div>
+        <div class="word-score" id="wordScore"></div>
+        <button class="icon-btn small" id="clearBtn" aria-label="Clear selection" hidden>
+          <svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div class="board-wrap" id="boardWrap">
+        <canvas id="board"></canvas>
+      </div>
+      <footer class="toolbar">
+        <button class="tool-btn" id="shuffleBtn">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 7h3c5 0 5 10 10 10h3M4 17h3c2 0 3-1.5 4-3.2M20 7h-3c-2 0-3 1.5-4 3.2M17 4l3 3-3 3M17 14l3 3-3 3" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Shuffle</span><b class="badge" id="shuffleCount">0</b>
+        </button>
+        <button class="tool-btn" id="hintBtn">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Hint</span><b class="badge" id="hintCount">0</b>
+        </button>
+      </footer>
+    </section>
+
+    <div class="modal" id="modal" hidden>
+      <div class="card" id="modalCard" role="dialog" aria-modal="true"></div>
+    </div>
+    <div class="banner" id="banner" aria-live="polite"></div>
+    <div class="vignette" id="vignette"></div>
+    <canvas id="fx" aria-hidden="true"></canvas>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+*.log
+.wrangler/
+# Never commit signing keys or secrets
+*.keystore
+*.jks
+*.p12
+*.p8
+*.mobileprovision
+.env
+.env.*

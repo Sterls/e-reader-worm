@@ -1,0 +1,7 @@
+// Only used if the site is deployed as a Cloudflare Worker (static assets).
+// Cloudflare Pages ignores this file and uses the "public" folder set in its settings.
+{
+  "name": "e-reader-worm",
+  "compatibility_date": "2026-06-01",
+  "assets": { "directory": "./public" }
+}
