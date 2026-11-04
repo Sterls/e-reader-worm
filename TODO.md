@@ -3,7 +3,8 @@
 Things **you** need to do are marked 👤. Things Claude can do next are marked 🤖.
 
 ## Now: play it with friends
-- [ ] 👤 Put the game online with Cloudflare: follow [docs/HOSTING.md](docs/HOSTING.md) (about 5 minutes, free).
+- [x] 👤 Put the game online with Cloudflare: https://e-reader-worm.tallygaming252.workers.dev/
+- [ ] 👤 Try **Story mode** chapter 1 and say what's too hard/easy, and what you'd like in chapter 2.
 - [ ] 👤 Play it, share the link, and note anything that feels too hard, too easy, confusing or ugly.
 - [ ] 👤 Decide whether "E-Reader Worm" is the final name. Before launch, search the name on
       Google Play, the App Store and the UK IPO trade mark search (https://www.gov.uk/search-for-trademark).
@@ -15,8 +16,8 @@ Things **you** need to do are marked 👤. Things Claude can do next are marked 
 - [x] 🤖 UK/EU consent form + "Privacy settings" button, privacy policy page (`/privacy.html`).
 - [x] 🤖 Store screenshots and feature graphic (`store/` folder), draft store text and form answers ([docs/PLAY_STORE.md](docs/PLAY_STORE.md)).
 - [ ] 👤 Install the test app on your phone and try it (docs/ANDROID.md, step 1).
-- [ ] 👤 Check you're happy with the app ID **`com.ereaderworm.game`**. It can **never** change after the first
-      Play upload. Tell Claude now if you want something else (e.g. matching your Whoosh Blocks style).
+- [ ] 👤 Before the **first Play upload**, confirm the app ID **`com.ereaderworm.game`** (or pick another).
+      It's fine to change it while testing, but it can never change once uploaded to Google Play.
 - [ ] 👤 Create your upload key (docs/ANDROID.md, step 2).
 - [ ] 👤 Get a **support email** that isn't your personal one (e.g. a new free Gmail just for the game).
       Play needs a public contact email; Claude can add it to the privacy page if you like.
@@ -53,6 +54,11 @@ Things **you** need to do are marked 👤. Things Claude can do next are marked 
 ## Website
 - [ ] 👤 (Optional) Buy a domain in Cloudflare and connect it (see docs/HOSTING.md).
 - [ ] 🤖 Add `app-ads.txt` to the site once AdMob is set up (required for ad income).
+
+## Story mode
+- [x] 🤖 Chapter 1 "Tales of the Salty Sea": 3 battles + a boss, dialogue, snacks, weak-spot words.
+- [ ] 🤖 Chapter 2 and beyond (new book, new enemies, new word themes, new attacks like frozen tiles).
+- [ ] 🤖 Optional: more items (e.g. a quill that doubles the next word's damage), story-only rewarded-ad snacks.
 
 ## Later ideas
 - [ ] 🤖 Online leaderboard (Supabase free plan).

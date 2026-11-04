@@ -28,6 +28,10 @@ npm test
 | `public/js/logic/` | Game rules: letters, words, scoring, levels, board, engine. No drawing code, fully tested |
 | `public/js/render.js` | Draws the board and its animations on a canvas |
 | `public/js/main.js` | Menus, touch controls, sounds and saving |
+| `public/js/logic/story.js` | Story chapters, enemies and dialogue (edit this to change the story) |
+| `public/js/logic/wordthemes.js` | Themed word lists for enemy weak spots |
+| `public/js/logic/battle.js` | Battle rules: damage, enemy attacks |
+| `public/js/story-art.js` | Character art (SVG) |
 | `public/js/ads.js` | Rewarded-ad hook (off on the web; used by the phone apps later) |
 | `public/words.txt` | The word list (ENABLE, public domain, see CREDITS.md) |
 | `tests/` | Automated tests (`npm test`) |
@@ -40,6 +44,11 @@ npm test
 | `docs/ANDROID.md` | Testing the Android app, upload key, first Play upload |
 | `docs/PLAY_STORE.md` | Draft store listing text and Play form answers |
 | `TODO.md` | Things the owner needs to do (accounts, store listings, etc.) |
+
+## Story mode in short
+- Your word's points ÷ 10 = damage. Words on the enemy's weak theme do ×2; resisted themes do ½.
+- The enemy attacks every few turns (shown on screen), sometimes planting glitch tiles or scrambling letters.
+- Snacks heal 25. You earn one per first-time win.
 
 ## Game rules in short
 - Words need 3+ letters. `Qu` is one tile. Diagonals count.

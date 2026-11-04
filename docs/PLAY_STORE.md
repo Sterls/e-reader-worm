@@ -13,10 +13,11 @@ Link letters. Make words. Keep the worm happy!
 
 E-Reader Worm is a cosy word puzzle with a twist. Swipe across touching letter tiles to spell words in any direction. Longer words and rare letters score big, and every few levels the challenge grows.
 
+★ STORY MODE: help Pip the bookworm save the library from the Static! Battle soggy, snippy and squawking monsters, where the right words hit their weak spots for double damage.
 ★ SWIPE TO SPELL: up, down, sideways or diagonal. Let go to play your word.
 ★ BONUS TILES: long words earn gold (×2), crystal (×3), wild tiles that become any letter, and bolts that blast a whole row.
 ★ GLITCH TILES: they count down with every word you play. Use them before they hit zero or lose a heart!
-★ ENDLESS LEVELS: each level has fresh goals. Clear them for a heart, a shuffle and a hint.
+★ ENDLESS MODE: each level has fresh goals. Clear them for a heart, a shuffle and a hint.
 ★ JUICY & RELAXING: satisfying pops, cheers for big words, confetti for level clears.
 ★ PLAY ONE-HANDED: made for portrait play on any phone, even on the bus.
 ★ FAIR & FREE: no forced ads, ever. Watch an optional video only if you want extra shuffles, hints, a second chance or new colour themes.
@@ -30,7 +31,7 @@ Over 160,000 valid words. How long can you keep going?
   - App icon 512×512: `public/icons/icon-512.png`
   - Feature graphic 1024×500: `store/feature-graphic.png`
   - Phone screenshots: `store/screenshot-*.png`
-- **Privacy policy URL**: `https://<your Cloudflare address>/privacy.html`
+- **Privacy policy URL**: `https://e-reader-worm.tallygaming252.workers.dev/privacy.html`
 
 ## App content answers
 - **Ads**: Yes, the app contains ads.

@@ -11,12 +11,17 @@ import { Sound, vibrate } from './audio.js';
 import { store } from './storage.js';
 import { Ads } from './ads.js';
 import { THEMES, THEME_ORDER } from './themes.js';
+import { CHAPTERS, ENEMIES } from './logic/story.js';
+import { THEME_LABELS } from './logic/wordthemes.js';
+import { wordDamage } from './logic/battle.js';
+import { ART, SPEAKERS } from './story-art.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString('en-GB');
 
 const settings = { sound: true, haptics: true, theme: 'ink', seenHowTo: false, ...store.get('settings', {}) };
 const best = { score: 0, level: 0, word: '', ...store.get('best', {}) };
+const story = { chapter: 'sea', beaten: 0, snacks: 1, seenIntro: false, ...store.get('story', {}) };
 const sound = new Sound();
 sound.enabled = settings.sound;
 const view = new BoardView($('board'));
@@ -72,7 +77,6 @@ function updateTitle() {
     ? `Best <b>${fmt(best.score)}</b> &middot; Level ${best.level}`
     : 'Make words. Squash glitches. Grow!';
   $('continueBtn').hidden = !savedGame();
-  $('playBtn').classList.toggle('primary', !savedGame());
 }
 
 // ---------- Modal ----------
@@ -112,7 +116,8 @@ const HOW_TO = `
     <li><span class="chip crystal">×3</span><span>7 letters earns a crystal tile (×3).</span></li>
     <li><span class="chip bolt">⚡</span><span>8+ letters earns a bolt tile, which clears its whole row.</span></li>
     <li><span class="chip glitch">5</span><span><b>Glitch tiles</b> count down after every word. Use them in a word before they hit 0, or you lose a heart. Lose all 3 and the game is over.</span></li>
-    <li><span class="chip paper">✓</span><span><b>Finish the goals</b> at the top to clear the level. Each level gives back a heart, a shuffle and a hint.</span></li>
+    <li><span class="chip paper">✓</span><span><b>Endless mode:</b> finish the goals at the top to clear the level. Each level gives back a heart, a shuffle and a hint.</span></li>
+    <li><span class="chip crystal">⚔</span><span><b>Story mode:</b> your words hit the enemy. Every enemy has a weak spot: words on its theme (like heat words) do double damage. Eat snacks to heal.</span></li>
   </ul>`;
 
 function showHowTo(onClose) {
@@ -177,16 +182,52 @@ function renderGoals() {
   }).join('');
 }
 
+function renderBattle() {
+  const b = state.battle;
+  const enemy = ENEMIES[b.enemyId];
+  const ch = CHAPTERS.find((c) => c.id === state.story?.chapter) || CHAPTERS[0];
+  const idx = state.story?.index ?? 0;
+  $('levelText').textContent = enemy.boss ? 'Boss battle' : `Battle ${idx + 1} of ${ch.battles.length}`;
+  const art = $('enemyArt');
+  if (art.dataset.enemy !== enemy.id) {
+    art.innerHTML = ART[enemy.art];
+    art.dataset.enemy = enemy.id;
+    art.className = 'enemy';
+  }
+  art.classList.toggle('enraged', b.enraged);
+  $('enemyName').textContent = enemy.name;
+  $('enemyHpBar').style.width = `${(100 * b.enemyHp) / b.enemyMax}%`;
+  $('enemyHpText').textContent = `${b.enemyHp} / ${b.enemyMax}`;
+  const weak = THEME_LABELS[enemy.weak];
+  $('enemyWeak').textContent = weak ? `Weak: ${weak.icon} ${weak.name} words` : '';
+  const atk = $('enemyAttack');
+  atk.textContent = b.result ? '' : b.attackIn <= 1 ? 'Attacks next turn!' : `Attacks in ${b.attackIn}`;
+  atk.classList.toggle('soon', !b.result && b.attackIn <= 1);
+  $('playerHpText').textContent = `${b.playerHp} / ${b.playerMax}`;
+  $('playerHpBar').style.width = `${(100 * b.playerHp) / b.playerMax}%`;
+  $('playerHp').classList.toggle('low', b.playerHp <= b.playerMax * 0.3);
+  $('snackCount').textContent = state.snacks;
+}
+
 function renderHud({ instantScore = false } = {}) {
-  $('levelText').textContent = `Level ${state.level}`;
+  const inBattle = !!state.battle;
+  $('battlePanel').hidden = !inBattle;
+  $('goals').hidden = inBattle;
+  $('hearts').hidden = inBattle;
+  $('playerHp').hidden = !inBattle;
+  $('snackBtn').hidden = !inBattle;
+  if (inBattle) renderBattle();
+  else $('levelText').textContent = `Level ${state.level}`;
   if (instantScore) {
     displayedScore = state.score;
     $('scoreText').textContent = fmt(state.score);
   } else if (Math.round(displayedScore) !== state.score) {
     animateScore(state.score);
   }
-  renderHearts();
-  renderGoals();
+  if (!inBattle) {
+    renderHearts();
+    renderGoals();
+  }
   $('shuffleCount').textContent = state.shuffles;
   $('hintCount').textContent = state.hints;
   renderWordBar();
@@ -206,7 +247,12 @@ function renderWordBar() {
   text.classList.remove('placeholder');
   const letters = path.map(([r, c]) => state.board[r][c].letter).join('');
   text.textContent = preview?.valid ? preview.word.toUpperCase() : letters.toUpperCase();
-  $('wordScore').textContent = preview?.valid ? `+${fmt(preview.points)}` : '';
+  let scoreText = preview?.valid ? `+${fmt(preview.points)}` : '';
+  if (preview?.valid && state.battle) {
+    const hit = wordDamage(preview.word, preview.points, ENEMIES[state.battle.enemyId]);
+    scoreText = `${hit.kind === 'weak' ? '★ ' : ''}${hit.damage} dmg${hit.kind === 'weak' ? ' ×2' : hit.kind === 'resist' ? ' ½' : ''}`;
+  }
+  $('wordScore').textContent = scoreText;
   bar.classList.toggle('valid', !!preview?.valid);
   $('clearBtn').hidden = false;
 }
@@ -227,7 +273,7 @@ function layout() {
 
 // ---------- Selecting letters ----------
 function canPlay() {
-  return state && dict && !state.gameOver && !state.levelComplete && !modalOpen() && $('game').classList.contains('active');
+  return state && dict && Engine.isPlaying(state) && !modalOpen() && !dialogueOpen() && $('game').classList.contains('active');
 }
 
 function indexInPath(cell) {
@@ -345,7 +391,9 @@ function submit() {
   saveGame();
 
   clearTimeout(pendingTimer);
-  if (state.gameOver) pendingTimer = setTimeout(showGameOver, 1100);
+  if (state.battle?.result === 'won') pendingTimer = setTimeout(onBattleWon, 900);
+  else if (state.battle?.result === 'lost') pendingTimer = setTimeout(onBattleLost, 1400);
+  else if (state.gameOver) pendingTimer = setTimeout(showGameOver, 1100);
   else if (state.levelComplete) pendingTimer = setTimeout(showLevelComplete, 900);
   else pendingTimer = setTimeout(checkStuck, 700);
 }
@@ -381,6 +429,18 @@ function handleEvents(events, played) {
       case 'reward':
         sound.reward();
         break;
+      case 'hit':
+        battleHit(ev);
+        break;
+      case 'enemyAttack':
+        setTimeout(() => enemyAttackFx(ev), 650);
+        break;
+      case 'enraged':
+        setTimeout(() => showBanner('Enraged!', ev.line, 'danger'), 300);
+        break;
+      case 'battleWon':
+        $('enemyArt').className = 'enemy defeated';
+        break;
       case 'glitchExpired':
         heartLost = true;
         view.pop([ev.id], { big: true });
@@ -393,16 +453,61 @@ function handleEvents(events, played) {
     }
   }
   if (heartLost) {
-    const v = $('vignette');
-    v.classList.remove('flash');
-    void v.offsetWidth;
-    v.classList.add('flash');
-    const h = $('hearts');
-    h.classList.remove('hit');
-    void h.offsetWidth;
-    h.classList.add('hit');
-    if (!state.gameOver) showBanner('Glitch!', 'You lost a heart', 'danger');
+    flashVignette();
+    restartAnim($(state.battle ? 'playerHp' : 'hearts'), 'hit');
+    if (state.battle) showBanner('Glitch!', 'It zapped Pip', 'danger');
+    else if (!state.gameOver) showBanner('Glitch!', 'You lost a heart', 'danger');
   }
+}
+
+function restartAnim(el, cls) {
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+
+function flashVignette() {
+  restartAnim($('vignette'), 'flash');
+}
+
+// ---------- Battle effects ----------
+function floatDamage(text, kind = '') {
+  const el = document.createElement('div');
+  el.className = `dmg ${kind}`;
+  el.textContent = text;
+  $('dmgLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1100);
+}
+
+function battleHit(ev) {
+  const art = $('enemyArt');
+  restartAnim(art, ev.kind === 'weak' ? 'weak-hit' : 'hurt');
+  setTimeout(() => { if (!art.classList.contains('defeated')) art.classList.remove('hurt', 'weak-hit'); }, 650);
+  floatDamage(`-${ev.damage}`, ev.kind);
+  if (ev.kind === 'weak') {
+    showBanner('Weak spot!', `×2 damage`);
+    vibrate(settings.haptics, [20, 30, 40]);
+  } else if (ev.kind === 'resist') {
+    showBanner('Resisted…', 'Only half damage', 'info');
+  }
+}
+
+function enemyAttackFx(ev) {
+  if (!state.battle) return;
+  const enemy = ENEMIES[state.battle.enemyId];
+  restartAnim($('enemyArt'), 'attack');
+  setTimeout(() => $('enemyArt').classList.remove('attack'), 650);
+  flashVignette();
+  restartAnim($('playerHp'), 'hit');
+  sound.glitch();
+  vibrate(settings.haptics, [50, 30, 50]);
+  view.shakeBoard(0.9);
+  const extra = ev.effect === 'glitch' ? 'and planted glitch tiles!' : ev.effect === 'scramble' ? 'and scrambled letters!' : '';
+  showBanner(`${enemy.name} attacks!`, `-${ev.damage} health ${extra}`, 'danger');
+  ev.ids.forEach((id) => {
+    const v = view.views.get(id);
+    if (v) { v.flash = 1; view.ring(v.ty, v.tx, ev.effect === 'glitch' ? '#ff3d6e' : '#ffffff'); }
+  });
 }
 
 function checkStuck() {
@@ -456,12 +561,32 @@ function onShuffle() {
   clearSelection();
   view.clearHint();
   view.sync(state.board);
+  if (res.events.length) handleEvents(res.events, []);
+  if (state.battle?.result === 'lost') { clearTimeout(pendingTimer); pendingTimer = setTimeout(onBattleLost, 1400); }
   view.shakeBoard(0.3);
   sound.noise({ dur: 0.25, vol: 0.2, freq: 1800, q: 0.7 });
   sound.reward();
   renderHud();
   saveGame();
   pendingTimer = setTimeout(checkStuck, 400);
+}
+
+function onSnack() {
+  if (!canPlay() || !state.battle) return;
+  sound.unlock();
+  if (state.snacks <= 0) {
+    if (!Ads.isAvailable()) { showBanner('No snacks left', 'Win battles to earn more', 'info'); return; }
+    offerAd('snack', () => { state.snacks += 1; story.snacks = state.snacks; saveStory(); });
+    return;
+  }
+  const res = Engine.useSnack(state);
+  if (!res.ok) { showBanner('Pip is full!', 'Health is already topped up', 'info'); return; }
+  story.snacks = state.snacks;
+  saveStory();
+  sound.reward();
+  showBanner(`+${res.healed} health`, 'Crunch! Pip feels better', 'info');
+  renderHud();
+  saveGame();
 }
 
 function onHint() {
@@ -564,8 +689,8 @@ function showPause() {
       <button class="btn primary" data-action="resume">Resume</button>
       <button class="btn" data-action="how">How to play</button>
       ${Ads.hasPrivacyOptions() ? '<button class="btn" data-action="privacy">Privacy settings</button>' : ''}
-      <button class="btn" data-action="restart">New game</button>
-      <button class="btn" data-action="menu">Main menu</button>
+      <button class="btn" data-action="restart">${state?.battle ? 'Restart battle' : 'New game'}</button>
+      <button class="btn" data-action="menu">${state?.battle ? 'Story map' : 'Main menu'}</button>
     </div>`, {
     sound: (btn) => {
       setSound(!settings.sound);
@@ -592,6 +717,11 @@ function showPause() {
     resume: closeModal,
     how: () => showHowTo(showPause),
     restart: () => {
+      if (state?.battle) {
+        closeModal();
+        startGame(Engine.newBattle(state.battle.enemyId, { snacks: story.snacks, chapter: state.story.chapter, index: state.story.index }));
+        return;
+      }
       showModal(`<h2>Start again?</h2><p>Your current game will be lost.</p>
         <div class="actions"><button class="btn primary" data-action="yes">Yes, new game</button>
         <button class="btn" data-action="no">Cancel</button></div>`, {
@@ -599,7 +729,12 @@ function showPause() {
         no: () => { closeModal(); showPause(); },
       }, () => { closeModal(); showPause(); });
     },
-    menu: () => { closeModal(); saveGame(); updateTitle(); showScreen('title'); },
+    menu: () => {
+      closeModal();
+      saveGame();
+      if (state?.battle) showStoryMap();
+      else { updateTitle(); showScreen('title'); }
+    },
   }, closeModal);
 }
 
@@ -639,6 +774,8 @@ function offerTheme(name) {
 
 // ---------- Android back button ----------
 function onBack(App) {
+  if (dialogueOpen()) { advanceDialogue(); return; }
+  if ($('story').classList.contains('active')) { updateTitle(); showScreen('title'); return; }
   if (modalOpen()) {
     if (modalBack) modalBack();
     return;
@@ -662,7 +799,214 @@ function setUpNative() {
 
 // ---------- Game lifecycle ----------
 function saveGame() {
-  if (state && !state.gameOver) store.set('save', state);
+  if (!state) return;
+  if (state.battle) {
+    if (!state.battle.result) store.set('storySave', state);
+  } else if (!state.gameOver) {
+    store.set('save', state);
+  }
+}
+
+function saveStory() {
+  store.set('story', story);
+}
+
+// ---------- Story mode ----------
+let dialogue = null;
+
+function dialogueOpen() {
+  return !$('dialogue').hidden;
+}
+
+function typeLine() {
+  const d = dialogue;
+  const line = d.lines[d.i];
+  const speaker = SPEAKERS[line.who] || SPEAKERS.narrator;
+  $('dlgPortrait').innerHTML = ART[speaker.art];
+  restartAnim($('dlgPortrait'), 'pop');
+  $('dlgName').textContent = speaker.name;
+  const el = $('dlgText');
+  el.classList.toggle('narration', line.who === 'narrator');
+  el.textContent = '';
+  d.typing = true;
+  let n = 0;
+  clearInterval(d.timer);
+  d.timer = setInterval(() => {
+    n += 2;
+    el.textContent = line.text.slice(0, n);
+    if (n % 6 === 0) sound.tone(520 + Math.random() * 80, { type: 'triangle', dur: 0.03, vol: 0.03 });
+    if (n >= line.text.length) { clearInterval(d.timer); d.typing = false; }
+  }, 22);
+}
+
+function advanceDialogue() {
+  const d = dialogue;
+  if (!d) return;
+  if (d.typing) {
+    clearInterval(d.timer);
+    d.typing = false;
+    $('dlgText').textContent = d.lines[d.i].text;
+    return;
+  }
+  d.i++;
+  if (d.i >= d.lines.length) endDialogue();
+  else { sound.click(); typeLine(); }
+}
+
+function endDialogue() {
+  const d = dialogue;
+  if (!d) return;
+  clearInterval(d.timer);
+  dialogue = null;
+  $('dialogue').hidden = true;
+  d.resolve();
+}
+
+/** Shows story lines one by one. Resolves when the player has read (or skipped) them. */
+function playDialogue(lines) {
+  if (!lines?.length) return Promise.resolve();
+  return new Promise((resolve) => {
+    dialogue = { lines, i: 0, resolve, typing: false, timer: null };
+    $('dialogue').hidden = false;
+    typeLine();
+  });
+}
+
+function currentChapter() {
+  return CHAPTERS.find((c) => c.id === story.chapter) || CHAPTERS[0];
+}
+
+function savedBattle() {
+  const s = store.get('storySave');
+  return s && s.version === Engine.SAVE_VERSION && s.battle && !s.battle.result ? s : null;
+}
+
+function showStoryMap() {
+  const ch = currentChapter();
+  const saved = savedBattle();
+  $('storyTitle').textContent = ch.title;
+  $('storySnacks').textContent = `🍎 × ${story.snacks}`;
+  $('storyPath').innerHTML = ch.battles.map((b, i) => {
+    const enemy = ENEMIES[b.enemy];
+    const done = i < story.beaten;
+    const current = i === story.beaten;
+    const locked = i > story.beaten;
+    const weak = THEME_LABELS[enemy.weak];
+    const resuming = saved && saved.story?.index === i;
+    const sub = locked ? '???' : `${resuming ? 'Battle in progress · ' : ''}Weak to ${weak.icon} ${weak.name}`;
+    return `<button class="story-node ${done ? 'done' : ''} ${current ? 'current' : ''} ${locked ? 'locked' : ''} ${enemy.boss ? 'boss' : ''}" data-index="${i}" ${locked ? 'disabled' : ''}>
+      <span class="portrait">${ART[enemy.art]}</span>
+      <span class="info"><span class="name">${locked ? (enemy.boss ? 'Boss' : 'Locked') : enemy.name}</span><span class="sub">${sub}</span></span>
+      <span class="state">${done ? '✓' : locked ? '🔒' : '▶'}</span>
+    </button>`;
+  }).join('');
+  $('storyPath').querySelectorAll('.story-node').forEach((el) => {
+    el.addEventListener('click', () => { sound.unlock(); sound.click(); startBattle(Number(el.dataset.index)); });
+  });
+  showScreen('story');
+  const node = $('storyPath').querySelector('.current');
+  node?.scrollIntoView({ block: 'center' });
+}
+
+async function openStory() {
+  if (!dict) return;
+  if (!story.seenIntro) {
+    await playDialogue(currentChapter().intro);
+    story.seenIntro = true;
+    saveStory();
+  }
+  showStoryMap();
+}
+
+async function startBattle(index) {
+  const ch = currentChapter();
+  const b = ch.battles[index];
+  if (!b || index > story.beaten) return;
+  const saved = savedBattle();
+  if (saved && saved.story?.index === index && saved.story?.chapter === ch.id) {
+    saved.snacks = story.snacks;
+    startGame(saved);
+    return;
+  }
+  const enemy = ENEMIES[b.enemy];
+  await playDialogue([...b.before, { who: b.enemy, text: enemy.taunt }]);
+  startGame(Engine.newBattle(b.enemy, { snacks: story.snacks, chapter: ch.id, index }));
+  showBanner(`${enemy.name}`, `Weak to ${THEME_LABELS[enemy.weak].name.toLowerCase()} words!`, 'info');
+}
+
+async function onBattleWon() {
+  if (state.battle?.result !== 'won') return;
+  const ch = currentChapter();
+  const index = state.story.index;
+  const enemy = ENEMIES[state.battle.enemyId];
+  const firstTime = index >= story.beaten;
+  store.remove('storySave');
+  sound.levelUp();
+  confetti.burst(enemy.boss ? 220 : 120);
+  showBanner('Victory!', enemy.name + ' is beaten');
+  await new Promise((r) => setTimeout(r, 1200));
+  await playDialogue([{ who: enemy.id, text: enemy.defeat }]);
+  if (firstTime) {
+    story.beaten = index + 1;
+    story.snacks = state.snacks + 1;
+  } else {
+    story.snacks = state.snacks;
+  }
+  saveStory();
+  const last = index === ch.battles.length - 1;
+  const next = () => {
+    closeModal();
+    if (last && firstTime) playDialogue(ch.outro).then(showStoryMap);
+    else if (!last) startBattle(index + 1);
+    else showStoryMap();
+  };
+  showModal(`
+    <h2>Victory!</h2>
+    <div class="story-win-art">${ART[enemy.art]}</div>
+    <div class="stats">
+      <span>Words played</span><span>${state.stats.words}</span>
+      <span>Best word</span><span>${state.stats.bestWord.toUpperCase() || '-'}</span>
+      <span>Health left</span><span>${state.battle.playerHp} / ${state.battle.playerMax}</span>
+      ${firstTime ? '<span>Reward</span><span>🍎 +1 snack</span>' : ''}
+    </div>
+    <div class="actions">
+      <button class="btn primary" data-action="next">${last ? (firstTime ? 'Continue the story' : 'Story map') : 'Next battle'}</button>
+      ${last ? '' : '<button class="btn" data-action="map">Story map</button>'}
+    </div>`, { next, map: () => { closeModal(); showStoryMap(); } }, () => { closeModal(); showStoryMap(); });
+}
+
+function onBattleLost() {
+  if (state.battle?.result !== 'lost') return;
+  sound.gameOver();
+  store.remove('storySave');
+  const enemy = ENEMIES[state.battle.enemyId];
+  const canRevive = Ads.isAvailable() && !state.revived;
+  const retry = () => {
+    closeModal();
+    startGame(Engine.newBattle(enemy.id, { snacks: story.snacks, chapter: state.story.chapter, index: state.story.index }));
+  };
+  showModal(`
+    <h2>Pip is worn out!</h2>
+    <p>${enemy.name} had ${state.battle.enemyHp} health left. Tip: ${THEME_LABELS[enemy.weak].name.toLowerCase()} words like
+    ${THEME_LABELS[enemy.weak].examples.join(', ')} do double damage.</p>
+    <div class="actions">
+      ${canRevive ? '<button class="btn gold" data-action="revive">Watch a video to keep fighting</button>' : ''}
+      <button class="btn primary" data-action="retry">Try again</button>
+      <button class="btn" data-action="map">Story map</button>
+    </div>`, {
+    revive: async () => {
+      if (await watchAd()) {
+        Engine.revive(state);
+        state.revived = true;
+        closeModal();
+        view.sync(state.board);
+        renderHud();
+        saveGame();
+      }
+    },
+    retry,
+    map: () => { closeModal(); showStoryMap(); },
+  }, () => { closeModal(); showStoryMap(); });
 }
 
 function startGame(newState) {
@@ -675,6 +1019,8 @@ function startGame(newState) {
   view.views.clear();
   view.effects = [];
   view.clearHint();
+  $('enemyArt').dataset.enemy = '';
+  $('dmgLayer').innerHTML = '';
   showScreen('game');
   layout();
   view.sync(state.board);
@@ -709,8 +1055,9 @@ async function loadWords() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     dict = Dictionary.fromText(await res.text());
     btn.disabled = false;
-    btn.textContent = 'New game';
+    btn.textContent = 'Endless mode';
     $('continueBtn').disabled = false;
+    $('storyBtn').disabled = false;
   } catch (err) {
     console.error(err);
     btn.disabled = false;
@@ -757,6 +1104,12 @@ function init() {
   $('pauseBtn').addEventListener('click', () => { sound.click(); showPause(); });
   $('shuffleBtn').addEventListener('click', onShuffle);
   $('hintBtn').addEventListener('click', onHint);
+  $('snackBtn').addEventListener('click', onSnack);
+  $('storyBtn').addEventListener('click', () => { sound.unlock(); sound.click(); openStory(); });
+  $('storyBackBtn').addEventListener('click', () => { sound.click(); updateTitle(); showScreen('title'); });
+  $('storyIntroBtn').addEventListener('click', () => { sound.unlock(); playDialogue(currentChapter().intro); });
+  $('dialogue').addEventListener('click', (e) => { if (e.target.id !== 'dlgSkip') advanceDialogue(); });
+  $('dlgSkip').addEventListener('click', () => { sound.click(); endDialogue(); });
   $('clearBtn').addEventListener('click', () => { sound.deselect(); clearSelection(); });
   $('wordBar').addEventListener('click', (e) => {
     if (e.target.closest('#clearBtn')) return;

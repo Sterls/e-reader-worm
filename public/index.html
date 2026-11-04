@@ -64,11 +64,28 @@
       </div>
       <div class="best" id="bestLine"></div>
       <div class="menu">
-        <button class="btn primary" id="continueBtn" hidden>Continue</button>
-        <button class="btn primary" id="playBtn" disabled>Loading words…</button>
+        <button class="btn primary" id="storyBtn" disabled>Story</button>
+        <button class="btn" id="continueBtn" hidden>Continue endless</button>
+        <button class="btn" id="playBtn" disabled>Loading words…</button>
         <button class="btn" id="howBtn">How to play</button>
       </div>
       <button class="link-btn" id="creditsBtn">Credits</button>
+    </section>
+
+    <!-- Story map -->
+    <section id="story" class="screen" aria-label="Story">
+      <header class="hud">
+        <button class="icon-btn" id="storyBackBtn" aria-label="Back">
+          <svg viewBox="0 0 24 24" width="24" height="24"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="hud-mid">
+          <div class="hud-level">Story</div>
+          <div class="story-title" id="storyTitle"></div>
+        </div>
+        <div class="snack-pill" id="storySnacks" title="Snacks"></div>
+      </header>
+      <div class="story-path" id="storyPath"></div>
+      <button class="link-btn" id="storyIntroBtn">Replay the story so far</button>
     </section>
 
     <!-- Game screen -->
@@ -82,8 +99,21 @@
           <div class="hud-score" id="scoreText">0</div>
         </div>
         <div class="hearts" id="hearts" aria-label="Hearts"></div>
+        <div class="player-hp" id="playerHp" hidden>
+          <div class="player-hp-top"><span class="pip-face" id="pipFace"></span><b id="playerHpText"></b></div>
+          <div class="hpbar"><i id="playerHpBar"></i></div>
+        </div>
       </header>
       <div class="goals" id="goals"></div>
+      <div class="battle" id="battlePanel" hidden>
+        <div class="enemy" id="enemyArt"></div>
+        <div class="enemy-info">
+          <div class="enemy-name" id="enemyName"></div>
+          <div class="hpbar enemy-hp"><i id="enemyHpBar"></i><span id="enemyHpText"></span></div>
+          <div class="enemy-meta"><span class="weak-chip" id="enemyWeak"></span><span class="attack-in" id="enemyAttack"></span></div>
+        </div>
+        <div class="dmg-layer" id="dmgLayer"></div>
+      </div>
       <div class="word-bar" id="wordBar">
         <div class="word-text" id="wordText"></div>
         <div class="word-score" id="wordScore"></div>
@@ -103,8 +133,24 @@
           <svg viewBox="0 0 24 24" width="22" height="22"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span>Hint</span><b class="badge" id="hintCount">0</b>
         </button>
+        <button class="tool-btn" id="snackBtn" hidden>
+          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 7c-3-3-8-1-8 4 0 5 4 10 8 10s8-5 8-10c0-5-5-7-8-4zM12 7c0-2 1-4 3-4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Snack</span><b class="badge" id="snackCount">0</b>
+        </button>
       </footer>
     </section>
+
+    <div class="dialogue" id="dialogue" hidden>
+      <div class="dlg-box">
+        <div class="dlg-portrait" id="dlgPortrait"></div>
+        <div class="dlg-body">
+          <div class="dlg-name" id="dlgName"></div>
+          <div class="dlg-text" id="dlgText"></div>
+          <div class="dlg-next">Tap to continue ▸</div>
+        </div>
+      </div>
+      <button class="dlg-skip" id="dlgSkip">Skip</button>
+    </div>
 
     <div class="modal" id="modal" hidden>
       <div class="card" id="modalCard" role="dialog" aria-modal="true"></div>

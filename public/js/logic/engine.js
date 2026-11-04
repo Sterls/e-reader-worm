@@ -5,6 +5,8 @@ import { emptyBoard, applyGravity, emptyCells, isValidPath, allTiles } from './b
 import { scoreWord, rewardsForLength } from './scoring.js';
 import { levelConfig, makeGoals, updateGoals, isGoalDone, SPECIAL_KINDS } from './levels.js';
 import { findBestWord } from './solver.js';
+import { createBattle, wordDamage, enemyTurn, battleSpawnConfig } from './battle.js';
+import { ENEMIES, GLITCH_DAMAGE, SNACK_HEAL } from './story.js';
 
 export const SAVE_VERSION = 1;
 export const MAX_HEARTS = 3;
@@ -34,6 +36,20 @@ export function newGame(seed = randomSeed()) {
   return state;
 }
 
+/** A story battle: same board, but you fight an enemy instead of chasing goals. */
+export function newBattle(enemyId, { seed = randomSeed(), snacks = 0, chapter = null, index = 0 } = {}) {
+  const state = newGame(seed);
+  state.mode = 'battle';
+  state.goals = [];
+  state.hearts = 0;
+  state.shuffles = 2;
+  state.hints = 1;
+  state.snacks = snacks;
+  state.story = { chapter, index };
+  state.battle = createBattle(enemyId);
+  return state;
+}
+
 function countKind(board, kind) {
   return allTiles(board).filter(({ tile }) => tile.kind === kind).length;
 }
@@ -45,7 +61,7 @@ function boardHasLetter(board, letter) {
 /** Fills empty cells with new tiles. `rewards` are special tile kinds to place first. */
 export function refill(state, rewards = []) {
   const { board, rng } = state;
-  const cfg = levelConfig(state.level);
+  const cfg = state.battle ? battleSpawnConfig(state.battle) : levelConfig(state.level);
   const empties = shuffleInPlace(rng, emptyCells(board));
   const counts = countLetters(board);
   let glitches = countKind(board, 'glitch');
@@ -106,8 +122,12 @@ export function evaluatePath(state, dict, path) {
  * Plays a word. Returns { ok: false, reason } or { ok: true, events, ... }.
  * Events tell the screen what to animate.
  */
+export function isPlaying(state) {
+  return !state.gameOver && !state.levelComplete && !state.battle?.result;
+}
+
 export function submitWord(state, dict, path) {
-  if (state.gameOver || state.levelComplete) return { ok: false, reason: 'not-playing' };
+  if (!isPlaying(state)) return { ok: false, reason: 'not-playing' };
   const evaluation = evaluatePath(state, dict, path);
   if (!evaluation.valid) return { ok: false, reason: 'not-a-word', word: evaluation.word };
 
@@ -149,7 +169,20 @@ export function submitWord(state, dict, path) {
     }
   });
 
-  const completedGoals = updateGoals(state.goals, {
+  // Story battles: the word hits the enemy.
+  const battle = state.battle;
+  if (battle) {
+    const enemy = ENEMIES[battle.enemyId];
+    const hit = wordDamage(word, scored.points, enemy);
+    battle.enemyHp = Math.max(0, battle.enemyHp - hit.damage);
+    events.push({ type: 'hit', damage: hit.damage, kind: hit.kind, enemyHp: battle.enemyHp });
+    if (battle.enemyHp <= 0) {
+      battle.result = 'won';
+      events.push({ type: 'battleWon' });
+    }
+  }
+
+  const completedGoals = battle ? [] : updateGoals(state.goals, {
     levelScore: state.levelScore,
     length,
     letters: tiles.map((t) => t.letter),
@@ -161,7 +194,7 @@ export function submitWord(state, dict, path) {
   for (const [r, c] of remove.values()) state.board[r][c] = null;
   applyGravity(state.board);
 
-  const levelDone = state.goals.every(isGoalDone);
+  const levelDone = battle ? battle.result === 'won' : state.goals.every(isGoalDone);
 
   // Glitch tiles count down after each word. When one reaches zero you lose a heart.
   if (!levelDone) {
@@ -169,9 +202,10 @@ export function submitWord(state, dict, path) {
       if (tile.kind !== 'glitch') continue;
       tile.timer--;
       if (tile.timer <= 0) {
-        state.hearts--;
+        if (battle) battle.playerHp = Math.max(0, battle.playerHp - GLITCH_DAMAGE);
+        else state.hearts--;
         state.board[r][c] = null;
-        events.push({ type: 'glitchExpired', id: tile.id, hearts: state.hearts });
+        events.push({ type: 'glitchExpired', id: tile.id, hearts: state.hearts, damage: battle ? GLITCH_DAMAGE : 0 });
       }
     }
     applyGravity(state.board);
@@ -180,6 +214,15 @@ export function submitWord(state, dict, path) {
   const rewards = rewardsForLength(length);
   rewards.forEach((kind) => events.push({ type: 'reward', kind }));
   refill(state, rewards);
+
+  if (battle) {
+    if (!battle.result && battle.playerHp <= 0) {
+      battle.result = 'lost';
+      events.push({ type: 'battleLost' });
+    }
+    if (!battle.result) events.push(...enemyTurn(state));
+    return { ok: true, events, word, points: scored.points, length };
+  }
 
   if (levelDone) {
     state.levelComplete = true;
@@ -213,13 +256,26 @@ export function rerollLetters(state) {
 }
 
 export function useShuffle(state) {
-  if (state.shuffles <= 0 || state.gameOver || state.levelComplete) return { ok: false };
+  if (state.shuffles <= 0 || !isPlaying(state)) return { ok: false };
   state.shuffles--;
-  return { ok: true, changed: rerollLetters(state) };
+  const changed = rerollLetters(state);
+  // In a battle, shuffling uses up your turn.
+  const events = state.battle ? enemyTurn(state) : [];
+  return { ok: true, changed, events };
+}
+
+/** Story battles: eat a snack to heal. Doesn't use up your turn. */
+export function useSnack(state) {
+  const b = state.battle;
+  if (!b || !isPlaying(state) || state.snacks <= 0 || b.playerHp >= b.playerMax) return { ok: false };
+  state.snacks--;
+  const before = b.playerHp;
+  b.playerHp = Math.min(b.playerMax, b.playerHp + SNACK_HEAL);
+  return { ok: true, healed: b.playerHp - before };
 }
 
 export function useHint(state, dict) {
-  if (state.hints <= 0 || state.gameOver || state.levelComplete) return { ok: false };
+  if (state.hints <= 0 || !isPlaying(state)) return { ok: false };
   const best = findBestWord(state.board, dict);
   if (!best) return { ok: false, reason: 'no-words' };
   state.hints--;
@@ -248,6 +304,16 @@ export function startNextLevel(state) {
 
 /** Continue after game over (for example after a rewarded ad in the app). */
 export function revive(state) {
+  if (state.battle) {
+    if (state.battle.result !== 'lost') return false;
+    state.battle.result = null;
+    state.battle.playerHp = Math.round(state.battle.playerMax / 2);
+    state.battle.attackIn = ENEMIES[state.battle.enemyId].attack.every;
+    for (const { tile } of allTiles(state.board)) {
+      if (tile.kind === 'glitch') { tile.kind = 'normal'; delete tile.timer; }
+    }
+    return true;
+  }
   if (!state.gameOver) return false;
   state.gameOver = false;
   state.hearts = 1;

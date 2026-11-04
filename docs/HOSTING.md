@@ -1,5 +1,7 @@
 # Putting the game online with Cloudflare (free)
 
+**Live now:** https://e-reader-worm.tallygaming252.workers.dev/
+
 The game is a plain website: everything it needs is in the `public` folder.
 There is nothing to "build". Cloudflare just serves those files.
 
