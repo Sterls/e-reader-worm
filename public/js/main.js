@@ -1050,6 +1050,8 @@ async function loadWords() {
   btn.disabled = true;
   $('continueBtn').disabled = true;
   btn.textContent = 'Loading words…';
+  $('storyBtn').disabled = true;
+  $('storyBtn').textContent = 'Loading words…';
   try {
     const res = await fetch('words.txt');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1058,6 +1060,7 @@ async function loadWords() {
     btn.textContent = 'Endless mode';
     $('continueBtn').disabled = false;
     $('storyBtn').disabled = false;
+    $('storyBtn').textContent = 'Story';
   } catch (err) {
     console.error(err);
     btn.disabled = false;
