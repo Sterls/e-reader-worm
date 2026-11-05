@@ -63,6 +63,13 @@ function setSound(on, { unlock = true } = {}) {
 
 // ---------- Screens ----------
 function showScreen(id) {
+  if (id !== 'game' && tutorial) {
+    tutorial = null;
+    showHand(false);
+    view.clearHint();
+    $('coach').hidden = true;
+    document.body.classList.remove('tutorial-on');
+  }
   document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
   if (id === 'game') requestAnimationFrame(layout);
 }
@@ -269,6 +276,7 @@ function layout() {
   const wrap = $('boardWrap');
   if (!wrap.clientWidth) return;
   view.resize(wrap.clientWidth, wrap.clientHeight);
+  if (tutorial && !tutorial.done && !$('tutHand').hidden) showHand(true);
 }
 
 // ---------- Selecting letters ----------
@@ -304,7 +312,8 @@ function onPointerDown(e) {
   if (!cell) return;
   e.preventDefault();
   try { e.target.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-  view.clearHint();
+  if (tutorial) showHand(false);
+  else view.clearHint();
   drag = { id: e.pointerId, moved: false, submitOnUp: false };
   const idx = indexInPath(cell);
   if (path.length && idx === path.length - 1) {
@@ -350,6 +359,7 @@ function onPointerUp(e) {
   drag = null;
   if (e.type === 'pointercancel' || !canPlay()) return;
   if ((d.moved && path.length >= 3) || d.submitOnUp) submit();
+  else if (tutorial && !tutorial.done && path.length < 3) setTimeout(() => { if (tutorial && !tutorial.done && path.length < 3 && !drag) showHand(true); }, 600);
 }
 
 // ---------- Playing a word ----------
@@ -373,8 +383,10 @@ function submit() {
     view.shakeBoard(0.35);
     setTimeout(() => bar.classList.remove('bad'), 400);
     clearSelection();
+    if (tutorial && !tutorial.done) showHand(true);
     return;
   }
+  tutorialWordPlayed();
   path = [];
   preview = null;
   view.setSelection([], false);
@@ -797,6 +809,68 @@ function setUpNative() {
   Ads.init();
 }
 
+// ---------- First-time tutorial ----------
+let tutorial = null;
+let handAnim = null;
+
+function tileCentre([r, c]) {
+  const canvas = $('board');
+  return [canvas.offsetLeft + (c + 0.5) * view.cell, canvas.offsetTop + (r + 0.5) * view.cell];
+}
+
+function showHand(show) {
+  const hand = $('tutHand');
+  handAnim?.cancel();
+  handAnim = null;
+  hand.hidden = !show || !tutorial;
+  if (hand.hidden) return;
+  const pts = tutorial.path.map(tileCentre);
+  const frames = [
+    { transform: `translate(${pts[0][0]}px, ${pts[0][1]}px) scale(1.3)`, opacity: 0, offset: 0 },
+    { transform: `translate(${pts[0][0]}px, ${pts[0][1]}px) scale(1)`, opacity: 1, offset: 0.12 },
+    ...pts.slice(1).map((p, i) => ({ transform: `translate(${p[0]}px, ${p[1]}px) scale(1)`, opacity: 1, offset: 0.12 + ((i + 1) / (pts.length - 1)) * 0.6 })),
+    { transform: `translate(${pts[pts.length - 1][0]}px, ${pts[pts.length - 1][1]}px) scale(1.3)`, opacity: 0, offset: 1 },
+  ];
+  handAnim = hand.animate(frames, { duration: 2600, iterations: Infinity, easing: 'ease-in-out' });
+}
+
+function startTutorial() {
+  if (settings.tutorialDone || !canPlay()) return;
+  const tutPath = Engine.placeTutorialWord(state);
+  tutorial = { path: tutPath };
+  clearSelection();
+  view.sync(state.board);
+  view.showHint(tutPath, 1e6);
+  document.body.classList.add('tutorial-on');
+  $('coachText').innerHTML = 'Swipe across touching letters to make words. <b>Any direction works</b>: up, down, sideways and <b>diagonal</b>! Try <b>WORM</b>.';
+  $('coachOk').hidden = true;
+  $('coachSkip').hidden = false;
+  $('coach').hidden = false;
+  showHand(true);
+  saveGame();
+}
+
+function tutorialWordPlayed() {
+  if (!tutorial || tutorial.done) return;
+  tutorial.done = true;
+  showHand(false);
+  view.clearHint();
+  $('coachText').innerHTML = 'Nice! Words can twist and turn any way you like. <b>Longer words score much more</b>, and earn bonus tiles.';
+  $('coachSkip').hidden = true;
+  $('coachOk').hidden = false;
+}
+
+function endTutorial() {
+  tutorial = null;
+  settings.tutorialDone = true;
+  settings.seenHowTo = true;
+  saveSettings();
+  showHand(false);
+  view.clearHint();
+  $('coach').hidden = true;
+  document.body.classList.remove('tutorial-on');
+}
+
 // ---------- Game lifecycle ----------
 function saveGame() {
   if (!state) return;
@@ -1027,7 +1101,9 @@ function startGame(newState) {
   view.setSelection([], false);
   renderHud({ instantScore: true });
   saveGame();
+  if (tutorial) endTutorial();
   if (state.levelComplete) pendingTimer = setTimeout(showLevelComplete, 500);
+  else if (!settings.tutorialDone && state.turn === 0) pendingTimer = setTimeout(startTutorial, 1100);
   else pendingTimer = setTimeout(checkStuck, 900);
 }
 
@@ -1091,8 +1167,6 @@ function init() {
       showModal(`<h2>New game?</h2><p>This will replace your saved game.</p>
         <div class="actions"><button class="btn primary" data-action="yes">Start new game</button>
         <button class="btn" data-action="no">Cancel</button></div>`, { yes: () => { closeModal(); go(); }, no: closeModal }, closeModal);
-    } else if (!settings.seenHowTo) {
-      showHowTo(go);
     } else go();
   });
   $('continueBtn').addEventListener('click', () => {
@@ -1108,6 +1182,8 @@ function init() {
   $('shuffleBtn').addEventListener('click', onShuffle);
   $('hintBtn').addEventListener('click', onHint);
   $('snackBtn').addEventListener('click', onSnack);
+  $('coachSkip').addEventListener('click', () => { sound.click(); endTutorial(); });
+  $('coachOk').addEventListener('click', () => { sound.click(); endTutorial(); });
   $('storyBtn').addEventListener('click', () => { sound.unlock(); sound.click(); openStory(); });
   $('storyBackBtn').addEventListener('click', () => { sound.click(); updateTitle(); showScreen('title'); });
   $('storyIntroBtn').addEventListener('click', () => { sound.unlock(); playDialogue(currentChapter().intro); });

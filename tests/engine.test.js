@@ -215,3 +215,24 @@ test('bolt, crystal and wild tiles only appear as rewards', async () => {
     }
   }
 });
+
+test('tutorial word is a real word laid out in more than one direction', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { Dictionary } = await import('../public/js/logic/dictionary.js');
+  const { placeTutorialWord, TUTORIAL_WORD } = await import('../public/js/logic/engine.js');
+  const dict = Dictionary.fromText(readFileSync(new URL('../public/words.txt', import.meta.url), 'utf8'));
+  for (const seed of [1, 2, 3]) {
+    const s = newGame(seed);
+    s.board[3][3].kind = 'glitch';
+    s.board[3][3].timer = 2;
+    const path = placeTutorialWord(s);
+    const ev = evaluatePath(s, dict, path);
+    assert.ok(ev.valid);
+    assert.equal(ev.word, TUTORIAL_WORD.toLowerCase());
+    assert.ok(path.every(([r, c]) => s.board[r][c].kind === 'normal'), 'tutorial tiles are plain');
+  }
+  const path = placeTutorialWord(newGame(1));
+  const dirs = new Set(path.slice(1).map(([r, c], i) => `${r - path[i][0]},${c - path[i][1]}`));
+  assert.ok(dirs.size >= 2, 'path changes direction');
+  assert.ok([...dirs].some((d) => !d.includes('0')), 'path includes a diagonal');
+});

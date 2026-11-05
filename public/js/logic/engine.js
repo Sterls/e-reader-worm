@@ -97,6 +97,22 @@ export function refill(state, rewards = []) {
   return placed;
 }
 
+// The first-time tutorial: a word laid out in a zigzag (diagonal, up, diagonal)
+// so new players see that words can go in any direction.
+export const TUTORIAL_PATH = [[4, 2], [3, 3], [2, 3], [3, 4]];
+export const TUTORIAL_WORD = 'WORM';
+
+/** Puts the tutorial word on the board as plain tiles. Returns the path to trace. */
+export function placeTutorialWord(state) {
+  TUTORIAL_PATH.forEach(([r, c], i) => {
+    const tile = state.board[r][c];
+    tile.letter = TUTORIAL_WORD[i];
+    tile.kind = 'normal';
+    delete tile.timer;
+  });
+  return TUTORIAL_PATH.map((p) => [...p]);
+}
+
 export function pathTiles(state, path) {
   return path.map(([r, c]) => state.board[r][c]);
 }

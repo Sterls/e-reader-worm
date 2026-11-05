@@ -297,3 +297,20 @@ button { font-family: inherit; color: inherit; touch-action: manipulation; curso
 @media (max-width: 370px) {
   .toolbar:has(#snackBtn:not([hidden])) .tool-btn span { display: none; }
 }
+
+/* ---------- First-time tutorial ---------- */
+.board-wrap { position: relative; }
+.tut-hand {
+  position: absolute; left: 0; top: 0; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85); box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.3), 0 4px 14px rgba(0,0,0,0.4);
+  pointer-events: none; z-index: 5;
+}
+.coach {
+  position: absolute; left: 6px; right: 6px; bottom: 6px; z-index: 6; background: var(--panel2); border-radius: 18px;
+  padding: 12px 14px 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 2px solid var(--accent); animation: popIn 0.35s ease;
+}
+.coach-text { font-size: 16.5px; line-height: 1.4; font-weight: 600; }
+.coach-text b { color: var(--gold); }
+.coach-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+.btn.small { padding: 9px 18px; font-size: 16px; border-radius: 14px; }
+.tutorial-on .toolbar { opacity: 0.35; pointer-events: none; }
